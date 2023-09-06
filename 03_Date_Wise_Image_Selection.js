@@ -99,7 +99,7 @@ Map.addLayer(Image1, vis_params, 'LST_Day_1km')
 
 /////////////////Downloading the ImageCollection//////////////////////////////
 var batch = require('users/fitoprincipe/geetools:batch')
-batch.Download.ImageCollection.toDrive(filtered_collection.select("LST_clipped"), 'Drive_Folder', 
+batch.Download.ImageCollection.toDrive(clipped_collection.select("LST_clipped"), 'Drive_Folder', 
                 {name: "LS8_LST{system_date}", 
                 scale: 1000, 
                 region: geometry,
