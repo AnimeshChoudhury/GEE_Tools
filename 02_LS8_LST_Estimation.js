@@ -1,71 +1,83 @@
-// Using established algorithms, this code utilizes Landsat 8 imagery data to
-// calculate  Land Surface Temperature (LST). Cloudy images are identified and
-// filtered out from the Landsat 8 images, ensuring that the LST calculation is
-// accurate and representative of the land surface. The processed images are 
-// clipped according to a defined Region of Interest (ROI). This feature enables 
-// users to focus on specific geographical areas of interest. Additionally, 
-// the code keeps track of the  acquisition dates of the images in
-// the collection, preparing them for convenient batch download.    
+/*
+  ============================================================================
+  LANDSAT 8 LAND SURFACE TEMPERATURE (LST) ESTIMATION
+  ============================================================================
+  
+  PURPOSE:
+  This script calculates Land Surface Temperature (LST) from Landsat 8 imagery
+  using established algorithms. Key features include:
+  - Cloud filtering for accurate LST calculations
+  - ROI-based clipping for focused analysis
+  - Batch download preparation with acquisition date tracking
+  
+  REFERENCE:
+  Based on algorithms from: https://doi.org/10.3390/rs12091471
+  GitHub: https://github.com/sofiaermida/Landsat_SMW_LST
+  
+  ============================================================================
+*/
 
-
-//// Creating a geometry (area of interest) ////
-var center = ee.Geometry.Point([80.3205380028601, 24.751017454572917])
-var size = 0.1 // (in degree)
+// ============================================================================
+// SECTION 1: DEFINE AREA OF INTEREST (AOI)
+// ============================================================================
+var center = ee.Geometry.Point([80.3205380028601, 24.751017454572917]); // Center coordinates
+var size = 0.1; // Buffer size in degrees
 var geometry = ee.FeatureCollection([
   ee.Feature(
     ee.Geometry.Rectangle(
       [center.getInfo()['coordinates'][0] - size/2,
-      center.getInfo()['coordinates'][1] - size/2,
-      center.getInfo()['coordinates'][0] + size/2,
-      center.getInfo()['coordinates'][1] + size/2]
+       center.getInfo()['coordinates'][1] - size/2,
+       center.getInfo()['coordinates'][0] + size/2,
+       center.getInfo()['coordinates'][1] + size/2]
     )
   )
-])
+]);
 
-
-// Set the zoom level (0-24)
-var zoom = 10;
-
-// Center the map on the specified location and set the zoom level
+// Set map visualization parameters
+var zoom = 10; // Zoom level (0-24)
 Map.centerObject(center, zoom);
-Map.addLayer(geometry)
+Map.addLayer(geometry);
 
-// LST estimation has been done according to (https://doi.org/10.3390/rs12091471)
-// please exploare the given link for better understanding of the LST computing 
-// from the Landsat thermal bands. Github: https://github.com/sofiaermida/Landsat_SMW_LST
+// ============================================================================
+// SECTION 2: CONFIGURE LST ESTIMATION PARAMETERS
+// ============================================================================
 
+// Load LST calculation module
 var LandsatLST = require('users/sofiaermida/landsat_smw_lst:modules/Landsat_LST.js');
-// Selecting date range, and landsat satellite
-var satellite = 'L8';
-var date_start = '2022-01-01';
-var date_end = '2022-12-31';
-var use_ndvi = true;
 
-// Getting landsat collection with added variables: NDVI, FVC, TPW, EM, LST
+// Configure processing parameters
+var satellite = 'L8';                    // Landsat 8 satellite
+var date_start = '2022-01-01';           // Start date
+var date_end = '2022-12-31';             // End date
+var use_ndvi = true;                     // Include NDVI calculation
+
+// Retrieve Landsat collection with computed variables
+// (NDVI, FVC, TPW, EM, LST)
 var LandsatColl = LandsatLST.collection(satellite, date_start, date_end, geometry, use_ndvi);
 print(LandsatColl);
 
-////// Filter and clip the LST ImageCollection with cloud cover and geometry //////
+// ============================================================================
+// SECTION 3: FILTER AND PROCESS IMAGE COLLECTION
+// ============================================================================
 
-
-// Function to clip and rename the images
+// Function to clip images and prepare for export
 var clip_ImageCollection = function(image) {
-  var clipped_image = image.select('LST').clip(geometry)
-  return clipped_image.rename("LST_clipped").copyProperties(image, image.propertyNames())
-} 
+  var clipped_image = image.select('LST').clip(geometry);
+  return clipped_image.rename("LST_clipped").copyProperties(image, image.propertyNames());
+};
 
+// Apply cloud filter and clipping
 var filtered_collection = (LandsatColl
-    .select(['LST'])                    
-    .filterMetadata('CLOUD_COVER', 'less_than', 1)
-    .map(clip_ImageCollection)
-)
+    .select(['LST'])                    // Select LST band
+    .filterMetadata('CLOUD_COVER', 'less_than', 1)  // Remove cloudy images
+    .map(clip_ImageCollection)          // Clip to AOI
+);
 
-print(filtered_collection)
-//////////////////Vizulization of the LST/////////////////////////
+print(filtered_collection);
 
-// Convert the image collection to a list
-var imageList = filtered_collection.toList(filtered_collection.size());
-var Image1 = ee.Image(imageList.get(0)); // select image index 
+// ============================================================================
+// SECTION 4: VISUALIZATION
+// ============================================================================
 
 // Define visualization parameters
 var vis_params = {
